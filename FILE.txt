@@ -1,0 +1,71 @@
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+# Dummy data to represent doctors and appointments
+doctors = [
+    {
+        "id": 1,
+        "name": "Dr. Smith",
+        "availability": "Evenings",
+        "max_patients": 10,
+    },
+    {
+        "id": 2,
+        "name": "Dr. Johnson",
+        "availability": "Evenings",
+        "max_patients": 10,  # Updated to limit to 10 patients
+    },
+]
+
+# Dummy data to represent available time slots
+time_slots = {
+    "Evenings": ["6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM", "8:00 PM"],
+}
+
+appointments = []
+
+# Function to count the number of patients booked for a doctor
+def count_patients(doctor_id):
+    return len([appt for appt in appointments if appt['doctor_id'] == doctor_id])
+
+# Endpoint to get doctor details
+@app.route('/doctors/<int:doctor_id>', methods=['GET'])
+def get_doctor(doctor_id):
+    doctor = next((doc for doc in doctors if doc['id'] == doctor_id), None)
+    if doctor:
+        return jsonify(doctor), 200
+    return jsonify({"message": "Doctor not found"}), 404
+
+# Endpoint to book an appointment
+@app.route('/appointments', methods=['POST'])
+def book_appointment():
+    data = request.get_json()
+    doctor_id = data.get('doctor_id')
+    
+    doctor = next((doc for doc in doctors if doc['id'] == doctor_id), None)
+    if not doctor:
+        return jsonify({"message": "Doctor not found"}), 404
+
+    if count_patients(doctor_id) >= doctor['max_patients']:
+        return jsonify({"message": "No available appointments"}), 400
+
+    requested_time = data.get('time')
+    if requested_time not in time_slots[doctor['availability']]:
+        return jsonify({"message": "Invalid time slot"}), 400
+
+    # Check if the requested time slot is already booked
+    if any(appt['doctor_id'] == doctor_id and appt['time'] == requested_time for appt in appointments):
+        return jsonify({"message": "Time slot already booked"}), 400
+
+    appointment = {
+        "doctor_id": doctor_id,
+        "patient_name": data.get('patient_name'),
+        "date": data.get('date'),
+        "time": requested_time,
+    }
+    appointments.append(appointment)
+    return jsonify({"message": "Appointment booked successfully"}), 201
+
+if __name__ == '__main__':
+    app.run(debug=True)
